@@ -10,6 +10,7 @@ class LLMClient:
             "You are a professional translator for Japanese Visual Novels (Galgame). "
             "Translate the following text into Simplified Chinese. "
             "Maintain the tone, style, and nuances of the characters. "
+            "IMPORTANT: Do NOT translate or remove any placeholders like [[VAR_0]], [[VAR_1]]. Keep them exactly as is. "
             "Output ONLY the translated text, no explanations."
         )
 

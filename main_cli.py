@@ -24,46 +24,71 @@ def main():
     db = TranslationDatabase("test_db.sqlite")
     processor = TextProcessor()
 
-    # 3. Mock Text Stream (Simulating Textractor Hook)
-    game_texts = [
-        "おはようございます。",
-        "今日はいい天気ですね。",
-        "先輩、一緒に帰りませんか？"
+    # 3. Mock Text Stream (Simulating Textractor Hook with fragmentation)
+    # Simulating: "Wait for", " fragments", " to merge."
+    mock_hook_events = [
+        "お", "は", "よ", "う", "ご", "ざ", "い", "ま", "す", "。", # Fragmented sentence 1
+        "system_log_001", # Garbage
+        "先輩、", "一緒に", "帰りませんか？" # Fragmented sentence 2
     ]
 
-    print(f"\n[System] Loaded {len(game_texts)} lines from mock hook.")
+    print(f"\n[System] Simulating {len(mock_hook_events)} hook events with debouncing...")
 
-    for original_text in game_texts:
-        print(f"\n>>> Hooked: {original_text}")
+    # Define a callback to handle 'finalized' text
+    def on_text_finalized(final_text):
+        print(f"\n>>> [Debounced Event] Text: '{final_text}'")
 
-        # Check Cache
-        cached = db.get_translation(original_text)
+        # 1. Protect Control Codes
+        protected_text, placeholders = processor.protect_control_codes(final_text)
+        if placeholders:
+            print(f"    [Protect] Masked: {protected_text} | Map: {placeholders}")
+
+        # 2. Check Cache
+        cached = db.get_translation(protected_text)
         if cached:
-            print(f"    [Cache] {cached}")
-            processor.add_to_history(original_text, cached)
-            continue
+            print(f"    [Cache] {processor.restore_control_codes(cached, placeholders)}")
+            processor.add_to_history(final_text, cached)
+            return
 
-        # Translate via API
-        # Note: In a real run without a valid key, this will print an Error message.
-        # For this demo, if the key is mock, we might want to simulate a response to show flow.
+        # 3. Translate via API
         if api_key == "sk-mock-key":
-             # Simulating API response for demo purposes
-             import time
-             time.sleep(0.5)
-             translated_text = f"[Simulated Translation] {original_text} (CN)"
+             # Simulating API response
+             translated_text = f"[Simulated] {protected_text} (CN)"
         else:
              translated_text = client.translate(
-                 original_text,
+                 protected_text,
                  history=processor.get_history(),
                  glossary=processor.get_glossary()
             )
 
-        print(f"    [API]   {translated_text}")
+        # 4. Restore Codes
+        final_translation = processor.restore_control_codes(translated_text, placeholders)
+        print(f"    [API]   {final_translation}")
 
-        # Save to Cache and History
+        # 5. Save
         if not translated_text.startswith("[Error"):
-            db.save_translation(original_text, translated_text, model="demo-model")
-            processor.add_to_history(original_text, translated_text)
+            db.save_translation(protected_text, translated_text, model="demo-model")
+            processor.add_to_history(final_text, final_translation)
+
+    # Simulate loop
+    import time
+    for frag in mock_hook_events:
+        # Feed fragment
+        processor.process_input_stream(frag, on_text_finalized)
+
+        # Simulate delays
+        if frag == "。":
+            # End of sentence 1, wait longer to trigger debounce
+            time.sleep(0.2)
+        elif "log" in frag:
+            # Garbage usually comes in bursts or separated events
+            time.sleep(0.2)
+        else:
+            # Normal typing speed
+            time.sleep(0.01)
+
+    # Wait for debounce to finish
+    time.sleep(1.0)
 
     print("\n=== Demo Complete ===")
     print("Check 'test_db.sqlite' for cached translations.")
