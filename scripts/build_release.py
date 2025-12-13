@@ -29,8 +29,12 @@ pip install -r UniversalGalTrans/requirements.txt > nul
 echo Starting Bridge Server...
 start /B python UniversalGalTrans/core/bridge_server.py
 
+echo Starting Overlay UI...
+start /B python UniversalGalTrans/core/overlay_ui.py
+
 echo.
 echo Server is running on http://localhost:5000
+echo Overlay is active.
 echo Configure your Hook (Textractor) to send POST requests to /translate
 echo.
 pause

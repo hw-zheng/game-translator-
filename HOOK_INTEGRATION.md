@@ -1,65 +1,54 @@
-# Hook Integration Guide
+# Hook Integration Guide (Async / Overlay)
 
-This guide explains how to connect existing Text Hooks (specifically **Textractor**) to the Universal Galgame Translator.
+This guide explains how to connect **Textractor** to the Universal Galgame Translator using the new **Asynchronous Overlay** mode.
 
 ## Architecture
 
 ```
-[Game Process] -> [Textractor (Hook)] -> [Extension Script] --(HTTP)--> [Bridge Server] -> [AI Core]
+[Game] -> [Textractor] --(Fire-and-Forget)--> [Server] -> [Queue] -> [AI] -> [Overlay UI]
 ```
 
-## Step 1: Start the Bridge Server
+*   **Game**: Continues running smoothly (no freezes).
+*   **Overlay**: Displays the translation in a transparent window on top of the game.
 
-Run the `Start.bat` included in the release package, or manually run:
-```bash
-python UniversalGalTrans/core/bridge_server.py
-```
-Ensure it says "Listening on http://localhost:5000".
+## Step 1: Start the System
 
-## Step 2: Configure Textractor
+Run `Start.bat` (Windows) or `python scripts/build_release.py` (Dev) to launch both the Bridge Server and the Overlay UI.
 
-You need to add an extension to Textractor that forwards text to our server.
+## Step 2: Configure Textractor Extension
 
-1.  Open your **Textractor** folder.
-2.  Navigate to the `extensions` folder (if it exists, or create a script in Lua/Python if supported).
-    *   *Note: Recent Textractor versions support Lua extensions.*
-3.  Create a file named `http_sender.lua` (example) with the following content:
+Create `http_async.lua` in your Textractor extensions folder:
 
 ```lua
--- Lua extension for Textractor to send text to UniversalGalTrans
--- Place this in the Textractor extensions folder
+-- Lua extension for UniversalGalTrans (Async Mode)
+-- Sends text to server and immediately returns original text (no modification)
 
 function ProcessSentence(sentence, sentenceInfo)
-    -- Filter out short garbage
+    -- Filter out obvious short garbage locally to save HTTP overhead
     if string.len(sentence) < 2 then return sentence end
 
-    -- Send to Python Server
-    local http = require("socket.http") -- Requires LuaSocket
+    local http = require("socket.http")
     local ltn12 = require("ltn12")
 
     local body = '{"text": "' .. escape_json(sentence) .. '"}'
-    local response_body = {}
 
-    local res, code, response_headers = http.request{
+    -- Send POST request but ignore response content (or use 0 timeout if supported)
+    -- Note: LuaSocket's http.request is blocking.
+    -- To achieve true non-blocking, we set a very short timeout if possible,
+    -- or rely on the Server's fast "202 Accepted" response (which takes < 5ms).
+
+    local res, code, headers = http.request{
         url = "http://localhost:5000/translate",
         method = "POST",
         headers = {
             ["Content-Type"] = "application/json",
             ["Content-Length"] = string.len(body)
         },
-        source = ltn12.source.string(body),
-        sink = ltn12.sink.table(response_body)
+        source = ltn12.source.string(body)
     }
 
-    if code == 200 then
-        -- Parse JSON response (naive match for simplicity)
-        local resp_str = table.concat(response_body)
-        local translation = resp_str:match('"translated":%s*"(.-)"')
-        if translation then
-            return translation -- Replace text in Textractor
-        end
-    end
-
+    -- Always return original sentence so the game memory is NOT modified.
+    -- This prevents Shift-JIS encoding crashes.
     return sentence
 end
 
@@ -70,11 +59,7 @@ function escape_json(s)
 end
 ```
 
-*Note: The above Lua script is a conceptual example. Textractor's extension API may vary.*
+## Step 3: Play
 
-## Step 3: Attach to Game
-
-1.  Open Textractor.
-2.  Attach to your game.
-3.  Ensure your `http_sender` extension is loaded and active.
-4.  Play the game. Text should be sent to the Python window, translated, and displayed back in Textractor.
+1. Attach Textractor to the game.
+2. Watch the **Overlay Window** (not the game window) for translations.

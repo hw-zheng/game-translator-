@@ -2,6 +2,8 @@ from flask import Flask, request, jsonify
 import sys
 import os
 import threading
+import queue
+import time
 
 # Ensure we can import core modules
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
@@ -13,13 +15,70 @@ from UniversalGalTrans.core.text_processor import TextProcessor
 app = Flask(__name__)
 
 # Initialize Core Components
-# In a real app, these config values should come from config.ini or env vars
 api_key = os.environ.get("OPENAI_API_KEY", "sk-mock-key")
 base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
 
 client = LLMClient(api_key=api_key, base_url=base_url)
 db = TranslationDatabase("trans_cache.sqlite")
-processor = TextProcessor(debounce_time=0.1)
+processor = TextProcessor(debounce_time=0.3) # Increased debounce for safety
+
+# Processing Queue for Async Handling
+text_queue = queue.Queue()
+
+# --- Background Worker ---
+def worker():
+    """Consumes text from queue and processes it via Debouncer -> AI."""
+    print("[Worker] Started background processing thread.")
+
+    def on_text_finalized(final_text):
+        """Callback when debouncer decides text is complete."""
+        print(f"[Worker] Processing finalized text: {final_text}")
+
+        # 1. Protect Control Codes
+        protected_text, placeholders = processor.protect_control_codes(final_text)
+
+        # 2. Check Cache
+        cached = db.get_translation(protected_text)
+        if cached:
+            final_translation = processor.restore_control_codes(cached, placeholders)
+            print(f"[Worker] Cache Hit: {final_translation[:20]}...")
+            processor.add_to_history(final_text, final_translation)
+            return
+
+        # 3. Call AI API
+        if api_key == "sk-mock-key":
+            # Simulate latency
+            time.sleep(0.5)
+            translated_text = f"[Simulated] {protected_text}"
+        else:
+            translated_text = client.translate(
+                protected_text,
+                history=processor.get_history(),
+                glossary=processor.get_glossary()
+            )
+
+        # 4. Restore & Save
+        final_translation = processor.restore_control_codes(translated_text, placeholders)
+        if not final_translation.startswith("[Error"):
+            db.save_translation(protected_text, translated_text)
+            processor.add_to_history(final_text, final_translation)
+
+        print(f"[Worker] Translation Ready: {final_translation[:20]}...")
+
+    while True:
+        try:
+            # Block until text arrives
+            raw_text = text_queue.get()
+            # Feed into Debouncer (Thread-safe)
+            processor.process_input_stream(raw_text, on_text_finalized)
+            text_queue.task_done()
+        except Exception as e:
+            print(f"[Worker] Error: {e}")
+
+# Start the worker thread
+threading.Thread(target=worker, daemon=True).start()
+
+# --- Endpoints ---
 
 @app.route('/status', methods=['GET'])
 def status():
@@ -28,8 +87,8 @@ def status():
 @app.route('/translate', methods=['POST'])
 def translate_endpoint():
     """
-    Endpoint to receive text from Hook.
-    Expected JSON: {"text": "Japanese text", "context": "optional context info"}
+    Async Endpoint. Receives text, pushes to queue, returns immediately.
+    Client (Hook) does NOT wait for translation.
     """
     data = request.json
     if not data or 'text' not in data:
@@ -37,56 +96,28 @@ def translate_endpoint():
 
     raw_text = data['text']
 
-    # 1. Immediate filtering (Garbage Check)
+    # 1. Immediate filtering (Garbage Check) - Fast check
     if processor.is_garbage(raw_text):
         print(f"[Bridge] Filtered garbage: {raw_text}")
-        return jsonify({"original": raw_text, "translated": raw_text, "status": "filtered"})
+        return jsonify({"status": "filtered"}), 200
 
-    # 2. Protect Control Codes
-    protected_text, placeholders = processor.protect_control_codes(raw_text)
+    # 2. Push to Queue
+    text_queue.put(raw_text)
 
-    # 3. Check Cache
-    cached = db.get_translation(protected_text)
-    if cached:
-        final_text = processor.restore_control_codes(cached, placeholders)
-        print(f"[Bridge] Cache Hit: {raw_text[:10]}... -> {final_text[:10]}...")
-        processor.add_to_history(raw_text, final_text)
-        return jsonify({"original": raw_text, "translated": final_text, "source": "cache"})
+    # 3. Return immediately (Fire-and-forget success)
+    return jsonify({"status": "queued"}), 202
 
-    # 4. Debounce Logic via HTTP?
-    # Issue: HTTP is request-response. We can't easily "hold" the request for debouncing without timeout risks.
-    # Hybrid Approach: The Hook should ideally handle fragmentation locally (Textractor has regex hooks).
-    # But if we rely on our Debouncer, we might need to use a 'Job ID' approach or simple blocking if the timeout is short (0.1s).
-    # For now, we assume the input is RELATIVELY complete or we accept blocking for 0.1s.
+@app.route('/latest', methods=['GET'])
+def get_latest():
+    """Endpoint for Overlay UI to pull the most recent translation."""
+    history = processor.get_history()
+    if not history:
+        return jsonify({"original": "", "translated": "Waiting for text..."})
 
-    # Let's try a synchronous wait for the debouncer for simplicity in this MVP.
-    # In a production async server (FastAPI), this would be cleaner.
-
-    # For MVP: We skip the complex threaded debouncer here and assume the Hook sends reasonably sane chunks,
-    # OR we just translate what we get (risk of fragmentation).
-    # To use the debouncer effectively, we'd need a WebSocket.
-    # Let's stick to direct translation for the REST API for now, but keep the Processor's history.
-
-    if api_key == "sk-mock-key":
-        translated_text = f"[Simulated] {protected_text}"
-    else:
-        translated_text = client.translate(
-            protected_text,
-            history=processor.get_history(),
-            glossary=processor.get_glossary()
-        )
-
-    final_text = processor.restore_control_codes(translated_text, placeholders)
-
-    # 5. Save & Return
-    if not final_text.startswith("[Error"):
-        db.save_translation(protected_text, translated_text)
-        processor.add_to_history(raw_text, final_text)
-
-    print(f"[Bridge] API Trans: {raw_text[:10]}... -> {final_text[:10]}...")
-    return jsonify({"original": raw_text, "translated": final_text, "source": "api"})
+    latest_entry = history[-1]
+    return jsonify(latest_entry)
 
 if __name__ == '__main__':
-    print("=== Universal Galgame Translation Bridge ===")
+    print("=== Universal Galgame Translation Bridge (Async) ===")
     print("Listening on http://localhost:5000")
     app.run(port=5000, debug=False)
