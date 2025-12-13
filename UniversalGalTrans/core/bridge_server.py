@@ -11,16 +11,19 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
 from UniversalGalTrans.core.llm_client import LLMClient
 from UniversalGalTrans.core.database import TranslationDatabase
 from UniversalGalTrans.core.text_processor import TextProcessor
+from UniversalGalTrans.core.config import get_config
 
 app = Flask(__name__)
 
-# Initialize Core Components
-api_key = os.environ.get("OPENAI_API_KEY", "sk-mock-key")
-base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+# Initialize Core Components via Config
+cfg = get_config()
+api_key = cfg.get("General", "OPENAI_API_KEY")
+base_url = cfg.get("General", "OPENAI_BASE_URL")
+debounce_time = cfg.get_float("General", "DEBOUNCE_TIME", 0.3)
 
 client = LLMClient(api_key=api_key, base_url=base_url)
 db = TranslationDatabase("trans_cache.sqlite")
-processor = TextProcessor(debounce_time=0.3) # Increased debounce for safety
+processor = TextProcessor(debounce_time=debounce_time)
 
 # Processing Queue for Async Handling
 text_queue = queue.Queue()
@@ -118,6 +121,8 @@ def get_latest():
     return jsonify(latest_entry)
 
 if __name__ == '__main__':
-    print("=== Universal Galgame Translation Bridge (Async) ===")
-    print("Listening on http://localhost:5000")
-    app.run(port=5000, debug=False)
+    host = cfg.get("Server", "HOST", "localhost")
+    port = cfg.get_int("Server", "PORT", 5000)
+    print(f"=== Universal Galgame Translation Bridge (Async) ===")
+    print(f"Listening on http://{host}:{port}")
+    app.run(host=host, port=port, debug=False)

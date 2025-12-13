@@ -3,11 +3,13 @@
 ## [Unreleased] - 2025-05-22
 
 ### Added
-- **Overlay UI (`core/overlay_ui.py`)**: A transparent, always-on-top window to display translations asynchronously. This resolves the Shift-JIS encoding issues by bypassing game memory injection.
-- **Asynchronous Bridge Server**: Refactored `bridge_server.py` to be non-blocking. The `/translate` endpoint now returns `202 Accepted` immediately and offloads processing to a background thread.
-- **Worker Thread with Debouncer**: The background worker now correctly integrates `TextProcessor.process_input_stream`, ensuring that text fragmentation (Risk 1.1) is handled before translation.
-- **Async Hook Integration**: Updated `HOOK_INTEGRATION.md` to use a "Fire-and-Forget" Lua script that does *not* modify game memory, preventing game freezes (Risk 2).
-- **Integration Tests**: Updated `tests/test_server_integration.py` and `tests/test_overlay_integration.py` to verify the async workflow.
+- **Configuration Manager (`core/config.py`)**: Centralized settings management reading from `config.ini`. Replaces environment variables for API keys and Server settings.
+- **Enhanced Overlay UI**:
+    - **Frameless Window**: Removed standard OS title bar for a true subtitle look.
+    - **Draggable**: Implemented mouse drag support to move the subtitle strip freely.
+    - **Customizable**: Font size, color, background, opacity, and window size are now configurable via `config.ini`.
+- **Refactored Server**: `bridge_server.py` now reads Host/Port and API keys from `config.ini`.
+- **Packaging Update**: `scripts/build_release.py` now includes a full `config.ini` template with Display settings.
 
 ### Test Results
 **Execution Time**: 2025-05-22

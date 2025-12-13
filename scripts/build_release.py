@@ -49,10 +49,22 @@ pause
 OPENAI_API_KEY=sk-your-key-here
 OPENAI_BASE_URL=https://api.openai.com/v1
 MODEL=gpt-3.5-turbo
+DEBOUNCE_TIME=0.3
+
+[Server]
+HOST=localhost
+PORT=5000
 
 [Display]
-# Mode: overlay or replace (not yet implemented in Python core)
-MODE=overlay
+FONT_FAMILY=Microsoft YaHei
+FONT_SIZE=16
+TEXT_COLOR=white
+BG_COLOR=black
+OPACITY=0.8
+WINDOW_WIDTH=800
+WINDOW_HEIGHT=150
+X_POS=100
+Y_POS=600
 """
     with open(os.path.join(dist_dir, "config.ini"), "w") as f:
         f.write(config_content)
