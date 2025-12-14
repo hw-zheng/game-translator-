@@ -14,48 +14,76 @@ if root_dir not in sys.path:
 from UniversalGalTrans.core.logger import setup_logger
 from UniversalGalTrans.core.config import get_config
 from UniversalGalTrans.core.textractor_manager import TextractorManager
+from UniversalGalTrans.core.llm_client import LLMClient
 import tkinter as tk
 from tkinter import simpledialog, messagebox
 
 logger = setup_logger("UGT_Launcher")
 
-def setup_wizard(cfg):
-    """Simple UI to ask for API Key if missing."""
-    api_key = cfg.get("General", "OPENAI_API_KEY")
+def test_connection(api_key, base_url, model):
+    """Try to connect to the AI service."""
+    try:
+        client = LLMClient(api_key=api_key, base_url=base_url, model=model)
+        success, msg = client.test_connection()
+        return success, msg
+    except Exception as e:
+        return False, str(e)
 
-    # Check for empty or placeholder keys
+def setup_wizard(cfg):
+    """UI to configure API and test connection."""
+    api_key = cfg.get("General", "OPENAI_API_KEY")
+    base_url = cfg.get("General", "OPENAI_BASE_URL")
+    model = cfg.get("General", "MODEL", "gpt-3.5-turbo")
+
+    # Always show setup if key is invalid, or offer a way to re-config/test?
+    # For now, trigger if key is default/missing.
     if not api_key or api_key in ["sk-mock-key", "sk-your-key-here"]:
         logger.info("Setup Wizard: No valid API Key found. Launching setup dialog...")
         try:
             root = tk.Tk()
             root.withdraw() # Hide main window
+
+            # Since simpledialog is limited, we might want a loop or just basic input
+            msg = "Welcome! Please configure your AI Provider (Qwen/OpenAI/DeepSeek).\n"
+
+            while True:
+                key = simpledialog.askstring("Setup Step 1/2", msg + "\nEnter API Key:")
+                if not key: return # User cancelled
+
+                base = simpledialog.askstring("Setup Step 2/2", "Enter Base URL (e.g. https://dashscope.aliyuncs.com/compatible-mode/v1):\n(Leave empty for default OpenAI)")
+                if base is None: return # User cancelled
+                if not base: base = "https://api.openai.com/v1"
+
+                # Test Connection
+                if messagebox.askyesno("Test Connection", "Do you want to test the connection now?"):
+                    success, error = test_connection(key, base, model)
+                    if success:
+                        messagebox.showinfo("Success", "Connection Verified!")
+                        # Save
+                        cfg.config["General"]["OPENAI_API_KEY"] = key
+                        cfg.config["General"]["OPENAI_BASE_URL"] = base
+                        cfg.config["General"]["PROVIDER"] = "openai" # Force compatible mode
+                        with open("config.ini", "w") as f:
+                            cfg.config.write(f)
+                        break
+                    else:
+                        retry = messagebox.askretrycancel("Connection Failed", f"Error: {error}\n\nCheck your Key and Base URL.")
+                        if not retry:
+                            break # Continue without saving or minimal save?
+                        # Loop back to ask key
+                else:
+                     # Save without testing
+                    cfg.config["General"]["OPENAI_API_KEY"] = key
+                    cfg.config["General"]["OPENAI_BASE_URL"] = base
+                    cfg.config["General"]["PROVIDER"] = "openai"
+                    with open("config.ini", "w") as f:
+                        cfg.config.write(f)
+                    break
+
+            root.destroy()
         except Exception as e:
             logger.error(f"Cannot initialize Tkinter: {e}")
             return
-
-        # Ask Provider
-        # Simple implementation: Just ask for Key and Base URL
-        msg = "Welcome! Please configure your AI Provider.\n\n"
-
-        key = simpledialog.askstring("Setup", msg + "Enter API Key (OpenAI/DeepSeek/Qwen):")
-        if key:
-            cfg.config["General"]["OPENAI_API_KEY"] = key
-
-            # Optional Base URL
-            base = simpledialog.askstring("Setup", "Enter Base URL (Leave empty for OpenAI):")
-            if base:
-                cfg.config["General"]["OPENAI_BASE_URL"] = base
-            else:
-                 cfg.config["General"]["OPENAI_BASE_URL"] = "https://api.openai.com/v1"
-
-            # Provider Hint
-            # We could ask, but let's default to openai since we use compatible endpoint
-            cfg.config["General"]["PROVIDER"] = "openai"
-
-            # Save
-            with open("config.ini", "w") as f:
-                cfg.config.write(f)
-        root.destroy()
 
 def main():
     logger.info("=== Universal Galgame Translator Launcher ===")
@@ -96,27 +124,28 @@ def main():
     )
     logger.info(f"Overlay UI started (PID: {ui_process.pid})")
 
-    # 3. Manage Textractor (Auto-Install & Launch)
+    # 3. Manage Textractor (Launch Local)
+    # Note: As per user request, we do NOT download. We expect it in tools/Textractor.
     tm = TextractorManager(os.getcwd())
     textractor_process = None
 
-    if not tm.is_installed():
-        logger.info("Textractor not found. Attempting to download...")
-        # Since we might be in GUI mode, maybe ask user? For now auto-download.
-        if tm.download_and_install():
-            tm.install_extension()
-    else:
+    if tm.is_installed():
         # Ensure hook is always up to date
         tm.install_extension()
-
-    if tm.is_installed():
         logger.info("Launching Textractor...")
         try:
             textractor_process = tm.launch()
         except Exception as e:
             logger.error(f"Failed to launch Textractor: {e}")
     else:
-        logger.warning("Textractor could not be installed. Please install manually.")
+        logger.warning("Textractor executable not found! Please place 'Textractor.exe' in the 'tools/Textractor' folder.")
+        # Optional: Warn user via UI
+        try:
+             root = tk.Tk()
+             root.withdraw()
+             messagebox.showwarning("Missing Component", "Textractor not found in 'tools/Textractor'.\nPlease install it manually to capture game text.")
+             root.destroy()
+        except: pass
 
     # 4. Monitor Loop
     logger.info("System is running. Close the Overlay window to exit.")

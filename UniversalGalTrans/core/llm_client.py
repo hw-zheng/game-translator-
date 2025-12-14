@@ -38,6 +38,19 @@ class LLMClient:
              # Default fallback
              self.client = OpenAI(api_key=api_key, base_url=base_url)
 
+    def test_connection(self):
+        """Tests the connection to the AI provider."""
+        try:
+            # We use a very cheap/simple call to verify connectivity
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": "Hello"}],
+                max_tokens=5
+            )
+            return True, "Connection successful"
+        except Exception as e:
+            return False, str(e)
+
     def translate(self, text, history=None, glossary=None):
         messages = [{"role": "system", "content": self.system_prompt}]
 

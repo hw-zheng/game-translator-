@@ -1,8 +1,6 @@
 import os
-import requests
-import zipfile
-import shutil
 import sys
+import subprocess
 
 # Force absolute import path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -14,54 +12,31 @@ from UniversalGalTrans.core.logger import setup_logger
 
 logger = setup_logger("UGT_Textractor")
 
-TEXTRACTOR_URL = "https://github.com/Artikash/Textractor/releases/download/v5.2.0/Textractor-v5.2.0.zip"
-# Note: GitHub releases often redirect. v5.2.0 is a stable known version.
-# For simplicity, we hardcode a reliable version, or we could query API.
-
 class TextractorManager:
     def __init__(self, base_path):
-        self.base_path = base_path
-        self.textractor_dir = os.path.join(base_path, "Textractor")
+        # 1. Check relative to this module (UniversalGalTrans/core/../tools/Textractor)
+        # This works for Source Code execution
+        module_tools = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "tools", "Textractor"))
+
+        # 2. Check relative to CWD/base_path (dist/tools/Textractor)
+        # This works for PyInstaller/Distribution
+        cwd_tools = os.path.join(base_path, "tools", "Textractor")
+
+        # 3. Check flat (dist/Textractor)
+        cwd_flat = os.path.join(base_path, "Textractor")
+
+        if os.path.exists(os.path.join(module_tools, "x64", "Textractor.exe")) or os.path.exists(os.path.join(module_tools, "Textractor.exe")):
+            self.textractor_dir = module_tools
+        elif os.path.exists(cwd_tools):
+            self.textractor_dir = cwd_tools
+        else:
+            self.textractor_dir = cwd_flat
+
         self.exe_path = os.path.join(self.textractor_dir, "x64", "Textractor.exe")
-        # Note: Textractor structure varies. Usually x86/x64 folder.
+        self._locate_exe()
 
     def is_installed(self):
         return os.path.exists(self.exe_path)
-
-    def download_and_install(self):
-        logger.info("Downloading Textractor...")
-        zip_path = os.path.join(self.base_path, "Textractor.zip")
-
-        try:
-            # Download
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-            }
-            response = requests.get(TEXTRACTOR_URL, headers=headers, stream=True)
-            if response.status_code == 200:
-                with open(zip_path, 'wb') as f:
-                    for chunk in response.iter_content(8192):
-                        f.write(chunk)
-            else:
-                logger.error(f"Failed to download Textractor. Status: {response.status_code}")
-                return False
-
-            # Extract
-            logger.info("Extracting Textractor...")
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(self.textractor_dir)
-
-            # Cleanup
-            os.remove(zip_path)
-
-            # Verify extraction (Find exe location)
-            self._locate_exe()
-
-            logger.info("Textractor installed successfully.")
-            return True
-        except Exception as e:
-            logger.error(f"Error installing Textractor: {e}")
-            return False
 
     def _locate_exe(self):
         """Update exe_path if it's in a subdir or root."""
