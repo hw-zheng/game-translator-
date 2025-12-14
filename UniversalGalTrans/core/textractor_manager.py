@@ -14,7 +14,7 @@ from UniversalGalTrans.core.logger import setup_logger
 
 logger = setup_logger("UGT_Textractor")
 
-TEXTRACTOR_URL = "https://github.com/Artikash/Textractor/releases/download/v5.2.0/Textractor-v5.2.0-Setup.zip"
+TEXTRACTOR_URL = "https://github.com/Artikash/Textractor/releases/download/v5.2.0/Textractor-v5.2.0.zip"
 # Note: GitHub releases often redirect. v5.2.0 is a stable known version.
 # For simplicity, we hardcode a reliable version, or we could query API.
 
@@ -34,10 +34,13 @@ class TextractorManager:
 
         try:
             # Download
-            response = requests.get(TEXTRACTOR_URL, stream=True)
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            }
+            response = requests.get(TEXTRACTOR_URL, headers=headers, stream=True)
             if response.status_code == 200:
                 with open(zip_path, 'wb') as f:
-                    for chunk in response.iter_content(1024):
+                    for chunk in response.iter_content(8192):
                         f.write(chunk)
             else:
                 logger.error(f"Failed to download Textractor. Status: {response.status_code}")
