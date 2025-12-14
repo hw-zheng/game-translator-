@@ -3,13 +3,10 @@
 ## [Unreleased] - 2025-05-22
 
 ### Added
-- **Configuration Manager (`core/config.py`)**: Centralized settings management reading from `config.ini`. Replaces environment variables for API keys and Server settings.
-- **Enhanced Overlay UI**:
-    - **Frameless Window**: Removed standard OS title bar for a true subtitle look.
-    - **Draggable**: Implemented mouse drag support to move the subtitle strip freely.
-    - **Customizable**: Font size, color, background, opacity, and window size are now configurable via `config.ini`.
-- **Refactored Server**: `bridge_server.py` now reads Host/Port and API keys from `config.ini`.
-- **Packaging Update**: `scripts/build_release.py` now includes a full `config.ini` template with Display settings.
+- **Unified Launcher (`launcher.py`)**: A single script to launch and monitor both the Bridge Server and Overlay UI subprocesses. Handles clean shutdown.
+- **Logging System (`core/logger.py`)**: Centralized logging to console and `UniversalGalTrans.log`. Replaced all `print()` statements for better debugging.
+- **Example Glossary (`glossary.txt`)**: Added a template for character name mapping.
+- **Build Update**: `scripts/build_release.py` now packages the Launcher, Logger, and Glossary correctly. `Start.bat` now points to the python launcher.
 
 ### Test Results
 **Execution Time**: 2025-05-22

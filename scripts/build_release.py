@@ -13,30 +13,25 @@ def create_dist():
 
     print(f"[Build] Creating '{dist_dir}' directory...")
 
-    # 2. Copy Python Core
+    # 2. Copy Python Core and Launcher
     target_pkg_dir = os.path.join(dist_dir, pkg_name)
     shutil.copytree(pkg_name, target_pkg_dir, ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '*.sqlite'))
     print("[Build] Copied Core module.")
 
+    # Copy Glossary
+    shutil.copy("glossary.txt", os.path.join(dist_dir, "glossary.txt"))
+    print("[Build] Copied glossary.txt")
+
     # 3. Create Launcher Script (Start.bat)
-    # Note: In a real scenario, this would use an embedded python or assume python is in PATH.
     bat_content = """@echo off
 echo Starting Universal Galgame Translator...
 echo Ensure you have Python 3.8+ installed.
 echo Installing dependencies...
 pip install -r UniversalGalTrans/requirements.txt > nul
 
-echo Starting Bridge Server...
-start /B python UniversalGalTrans/core/bridge_server.py
+echo Launching System...
+python UniversalGalTrans/launcher.py
 
-echo Starting Overlay UI...
-start /B python UniversalGalTrans/core/overlay_ui.py
-
-echo.
-echo Server is running on http://localhost:5000
-echo Overlay is active.
-echo Configure your Hook (Textractor) to send POST requests to /translate
-echo.
 pause
 """
     with open(os.path.join(dist_dir, "Start.bat"), "w") as f:

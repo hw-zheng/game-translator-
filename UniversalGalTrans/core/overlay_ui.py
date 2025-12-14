@@ -7,6 +7,9 @@ import os
 # Ensure config can be imported
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
 from UniversalGalTrans.core.config import get_config
+from UniversalGalTrans.core.logger import setup_logger
+
+logger = setup_logger("UGT_UI")
 
 class SubtitleOverlay:
     def __init__(self):

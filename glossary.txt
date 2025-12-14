@@ -1,0 +1,5 @@
+# Character Name Mapping
+# Format: Japanese = Chinese
+主人公 = 主人公
+先輩 = 学姐
+先生 = 老师

@@ -12,7 +12,9 @@ from UniversalGalTrans.core.llm_client import LLMClient
 from UniversalGalTrans.core.database import TranslationDatabase
 from UniversalGalTrans.core.text_processor import TextProcessor
 from UniversalGalTrans.core.config import get_config
+from UniversalGalTrans.core.logger import setup_logger
 
+logger = setup_logger("UGT_Server")
 app = Flask(__name__)
 
 # Initialize Core Components via Config
@@ -31,11 +33,11 @@ text_queue = queue.Queue()
 # --- Background Worker ---
 def worker():
     """Consumes text from queue and processes it via Debouncer -> AI."""
-    print("[Worker] Started background processing thread.")
+    logger.info("Started background processing thread.")
 
     def on_text_finalized(final_text):
         """Callback when debouncer decides text is complete."""
-        print(f"[Worker] Processing finalized text: {final_text}")
+        logger.info(f"Processing finalized text: {final_text}")
 
         # 1. Protect Control Codes
         protected_text, placeholders = processor.protect_control_codes(final_text)
@@ -44,7 +46,7 @@ def worker():
         cached = db.get_translation(protected_text)
         if cached:
             final_translation = processor.restore_control_codes(cached, placeholders)
-            print(f"[Worker] Cache Hit: {final_translation[:20]}...")
+            logger.info(f"Cache Hit: {final_translation[:20]}...")
             processor.add_to_history(final_text, final_translation)
             return
 
@@ -66,7 +68,7 @@ def worker():
             db.save_translation(protected_text, translated_text)
             processor.add_to_history(final_text, final_translation)
 
-        print(f"[Worker] Translation Ready: {final_translation[:20]}...")
+        logger.info(f"Translation Ready: {final_translation[:20]}...")
 
     while True:
         try:
@@ -76,7 +78,7 @@ def worker():
             processor.process_input_stream(raw_text, on_text_finalized)
             text_queue.task_done()
         except Exception as e:
-            print(f"[Worker] Error: {e}")
+            logger.error(f"Worker Error: {e}")
 
 # Start the worker thread
 threading.Thread(target=worker, daemon=True).start()
@@ -101,7 +103,7 @@ def translate_endpoint():
 
     # 1. Immediate filtering (Garbage Check) - Fast check
     if processor.is_garbage(raw_text):
-        print(f"[Bridge] Filtered garbage: {raw_text}")
+        logger.info(f"Filtered garbage: {raw_text}")
         return jsonify({"status": "filtered"}), 200
 
     # 2. Push to Queue
