@@ -24,9 +24,11 @@ app = Flask(__name__)
 cfg = get_config()
 api_key = cfg.get("General", "OPENAI_API_KEY")
 base_url = cfg.get("General", "OPENAI_BASE_URL")
+model = cfg.get("General", "MODEL", "gpt-3.5-turbo")
+provider = cfg.get("General", "PROVIDER", "openai")
 debounce_time = cfg.get_float("General", "DEBOUNCE_TIME", 0.3)
 
-client = LLMClient(api_key=api_key, base_url=base_url)
+client = LLMClient(api_key=api_key, base_url=base_url, model=model, provider=provider)
 db = TranslationDatabase("trans_cache.sqlite")
 processor = TextProcessor(debounce_time=debounce_time)
 

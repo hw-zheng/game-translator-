@@ -1,11 +1,15 @@
 import os
-from openai import OpenAI
 import json
+import requests
+from openai import OpenAI
 
 class LLMClient:
-    def __init__(self, api_key, base_url="https://api.openai.com/v1", model="gpt-3.5-turbo"):
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+    def __init__(self, api_key, base_url, model, provider="openai"):
+        self.api_key = api_key
+        self.base_url = base_url
         self.model = model
+        self.provider = provider.lower()
+
         self.system_prompt = (
             "You are a professional translator for Japanese Visual Novels (Galgame). "
             "Translate the following text into Simplified Chinese. "
@@ -14,15 +18,27 @@ class LLMClient:
             "Output ONLY the translated text, no explanations."
         )
 
-    def translate(self, text, history=None, glossary=None):
-        """
-        Translate text using the configured LLM.
+        if self.provider == "openai" or self.provider == "deepseek" or self.provider == "qwen":
+            # DeepSeek and Qwen are often OpenAI-compatible
+            self.client = OpenAI(api_key=api_key, base_url=base_url)
 
-        Args:
-            text (str): The Japanese text to translate.
-            history (list): List of previous messages for context (optional).
-            glossary (dict): Key-value pairs of terms to force (optional).
-        """
+        # Gemini setup (REST fallback if library not present, or use custom logic)
+        # For now, we will assume OpenAI compatibility for simplicity unless Gemini is strictly different.
+        # Actually, Google's OpenAI compatibility endpoint is `https://generativelanguage.googleapis.com/v1beta/openai/`
+        # So we can treat Gemini as OpenAI-compatible if the user provides the correct base URL.
+        # But if we want native Gemini REST, we'd add it here.
+        # Let's stick to OpenAI wrapper for all for now, as it's the standard.
+        elif self.provider == "gemini":
+             # Google GenAI via OpenAI adapter usually
+             self.client = OpenAI(
+                 api_key=api_key,
+                 base_url=base_url if base_url else "https://generativelanguage.googleapis.com/v1beta/openai/"
+             )
+        else:
+             # Default fallback
+             self.client = OpenAI(api_key=api_key, base_url=base_url)
+
+    def translate(self, text, history=None, glossary=None):
         messages = [{"role": "system", "content": self.system_prompt}]
 
         # Inject glossary instructions if present
@@ -30,21 +46,27 @@ class LLMClient:
             glossary_text = "\n".join([f"{k} -> {v}" for k, v in glossary.items()])
             messages[0]["content"] += f"\n\nGlossary (Use these strictly):\n{glossary_text}"
 
-        # Add history if present (limit to last 5 entries to save tokens)
+        # Add history
         if history:
             for h in history[-5:]:
                 messages.append({"role": "user", "content": h['original']})
                 messages.append({"role": "assistant", "content": h['translated']})
 
-        # Add current message
         messages.append({"role": "user", "content": text})
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.3,
-            )
+            # Special handling for different providers if needed parameters differ
+            params = {
+                "model": self.model,
+                "messages": messages,
+                "temperature": 0.3,
+            }
+
+            # Gemini OpenAI adapter sometimes requires max_tokens
+            if self.provider == "gemini":
+                params["max_tokens"] = 1024
+
+            response = self.client.chat.completions.create(**params)
             return response.choices[0].message.content.strip()
         except Exception as e:
             return f"[Error: {str(e)}]"
