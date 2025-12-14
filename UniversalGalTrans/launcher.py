@@ -5,8 +5,8 @@ import time
 import signal
 import threading
 
-# Add root to path
-sys.path.append(os.path.dirname(__file__))
+# Add root to path (parent of this script)
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from UniversalGalTrans.core.logger import setup_logger
 from UniversalGalTrans.core.config import get_config

@@ -2,6 +2,10 @@
 
 ## [Unreleased] - 2025-05-22
 
+### Fixed
+- **Launcher Crash**: Fixed `ModuleNotFoundError` in `launcher.py` by correctly adding the parent directory to `sys.path`. This ensures the script runs correctly from `Start.bat` inside the `dist` folder.
+- **Import Paths**: Verified and standardized import paths across `bridge_server.py`, `overlay_ui.py`, and `launcher.py` to support both dev and production environments.
+
 ### Added
 - **README Localization**: Translated the entire documentation to Chinese, including "Quick Start" guide and architecture explanation.
 - **Unified Launcher (`launcher.py`)**: A single script to launch and monitor both the Bridge Server and Overlay UI subprocesses. Handles clean shutdown.
