@@ -22,9 +22,16 @@ logger = setup_logger("UGT_Launcher")
 def setup_wizard(cfg):
     """Simple UI to ask for API Key if missing."""
     api_key = cfg.get("General", "OPENAI_API_KEY")
-    if not api_key or api_key == "sk-mock-key":
-        root = tk.Tk()
-        root.withdraw() # Hide main window
+
+    # Check for empty or placeholder keys
+    if not api_key or api_key in ["sk-mock-key", "sk-your-key-here"]:
+        logger.info("Setup Wizard: No valid API Key found. Launching setup dialog...")
+        try:
+            root = tk.Tk()
+            root.withdraw() # Hide main window
+        except Exception as e:
+            logger.error(f"Cannot initialize Tkinter: {e}")
+            return
 
         # Ask Provider
         # Simple implementation: Just ask for Key and Base URL
