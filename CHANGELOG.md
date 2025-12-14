@@ -3,8 +3,8 @@
 ## [Unreleased] - 2025-05-22
 
 ### Fixed
-- **Launcher Crash**: Fixed `ModuleNotFoundError` in `launcher.py` by correctly adding the parent directory to `sys.path`. This ensures the script runs correctly from `Start.bat` inside the `dist` folder.
-- **Import Paths**: Verified and standardized import paths across `bridge_server.py`, `overlay_ui.py`, and `launcher.py` to support both dev and production environments.
+- **Launcher Path Error**: Fixed `ModuleNotFoundError` when running `launcher.py` (via `Start.bat`) by forcing the package root directory into `sys.path`. This ensures absolute imports work reliably in the distribution environment.
+- **Subprocess Paths**: Applied the same path robustness fix to `bridge_server.py` and `overlay_ui.py` to prevent import errors when they are spawned as subprocesses.
 
 ### Added
 - **README Localization**: Translated the entire documentation to Chinese, including "Quick Start" guide and architecture explanation.

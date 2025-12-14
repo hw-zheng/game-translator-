@@ -5,8 +5,11 @@ import threading
 import queue
 import time
 
-# Ensure we can import core modules
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
+# Ensure we can import core modules - Force absolute path and insert at beginning
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.abspath(os.path.join(current_dir, '../../'))
+if root_dir not in sys.path:
+    sys.path.insert(0, root_dir)
 
 from UniversalGalTrans.core.llm_client import LLMClient
 from UniversalGalTrans.core.database import TranslationDatabase

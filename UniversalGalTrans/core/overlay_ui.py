@@ -4,8 +4,12 @@ import time
 import requests
 import sys
 import os
-# Ensure config can be imported
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
+# Ensure config can be imported - Force absolute path and insert at beginning
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.abspath(os.path.join(current_dir, '../../'))
+if root_dir not in sys.path:
+    sys.path.insert(0, root_dir)
+
 from UniversalGalTrans.core.config import get_config
 from UniversalGalTrans.core.logger import setup_logger
 

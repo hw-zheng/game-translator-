@@ -5,11 +5,8 @@ import time
 import signal
 import threading
 
-# Add root to path (parent of this script) - Force absolute path and insert at beginning
-current_dir = os.path.dirname(os.path.abspath(__file__))
-root_dir = os.path.abspath(os.path.join(current_dir, '..'))
-if root_dir not in sys.path:
-    sys.path.insert(0, root_dir)
+# Add root to path (parent of this script)
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from UniversalGalTrans.core.logger import setup_logger
 from UniversalGalTrans.core.config import get_config
