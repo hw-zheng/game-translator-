@@ -47,27 +47,33 @@ def setup_wizard(cfg):
             msg = "Welcome! Please configure your AI Provider (Qwen/OpenAI/DeepSeek).\n"
 
             while True:
-                key = simpledialog.askstring("Setup Step 1/2", msg + "\nEnter API Key:")
+                key = simpledialog.askstring("Setup Step 1/3", msg + "\nEnter API Key:")
                 if not key: return # User cancelled
 
-                base = simpledialog.askstring("Setup Step 2/2", "Enter Base URL (e.g. https://dashscope.aliyuncs.com/compatible-mode/v1):\n(Leave empty for default OpenAI)")
+                base = simpledialog.askstring("Setup Step 2/3", "Enter Base URL (e.g. https://dashscope.aliyuncs.com/compatible-mode/v1):\n(Leave empty for default OpenAI)")
                 if base is None: return # User cancelled
                 if not base: base = "https://api.openai.com/v1"
 
+                # Step 3: Model Selection
+                model_input = simpledialog.askstring("Setup Step 3/3", "Enter Model Name (e.g., gpt-3.5-turbo, qwen-plus, deepseek-chat):")
+                if model_input is None: return # User cancelled
+                if not model_input: model_input = "gpt-3.5-turbo"
+
                 # Test Connection
-                if messagebox.askyesno("Test Connection", "Do you want to test the connection now?"):
-                    success, error = test_connection(key, base, model)
+                if messagebox.askyesno("Test Connection", f"Do you want to test the connection to '{model_input}' now?"):
+                    success, error = test_connection(key, base, model_input)
                     if success:
                         messagebox.showinfo("Success", "Connection Verified!")
                         # Save
                         cfg.config["General"]["OPENAI_API_KEY"] = key
                         cfg.config["General"]["OPENAI_BASE_URL"] = base
+                        cfg.config["General"]["MODEL"] = model_input
                         cfg.config["General"]["PROVIDER"] = "openai" # Force compatible mode
                         with open("config.ini", "w") as f:
                             cfg.config.write(f)
                         break
                     else:
-                        retry = messagebox.askretrycancel("Connection Failed", f"Error: {error}\n\nCheck your Key and Base URL.")
+                        retry = messagebox.askretrycancel("Connection Failed", f"Error: {error}\n\nCheck your Key, URL, and Model Name.")
                         if not retry:
                             break # Continue without saving or minimal save?
                         # Loop back to ask key
@@ -75,6 +81,7 @@ def setup_wizard(cfg):
                      # Save without testing
                     cfg.config["General"]["OPENAI_API_KEY"] = key
                     cfg.config["General"]["OPENAI_BASE_URL"] = base
+                    cfg.config["General"]["MODEL"] = model_input
                     cfg.config["General"]["PROVIDER"] = "openai"
                     with open("config.ini", "w") as f:
                         cfg.config.write(f)
