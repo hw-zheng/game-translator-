@@ -42,12 +42,21 @@ def worker():
 
     def on_text_finalized(final_text):
         """Callback when debouncer decides text is complete."""
+        # 0. Strict Deduplication (Session Level)
+        # If this exact text was just translated (is the latest in history), skip it.
+        # This handles games that spam the same line repeatedly.
+        history = processor.get_history()
+        if history and history[-1]['original'] == final_text:
+             logger.info(f"Duplicate text ignored: {final_text[:20]}...")
+             return
+
         logger.info(f"Processing finalized text: {final_text}")
 
         # 1. Protect Control Codes
         protected_text, placeholders = processor.protect_control_codes(final_text)
 
-        # 2. Check Cache
+        # 2. Check Cache (Global Level)
+        # This prevents token waste if the text was translated in a previous session or earlier in this one.
         cached = db.get_translation(protected_text)
         if cached:
             final_translation = processor.restore_control_codes(cached, placeholders)
