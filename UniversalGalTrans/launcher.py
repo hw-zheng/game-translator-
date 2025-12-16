@@ -43,21 +43,42 @@ def setup_wizard(cfg):
             root = tk.Tk()
             root.withdraw() # Hide main window
 
-            # Since simpledialog is limited, we might want a loop or just basic input
-            msg = "Welcome! Please configure your AI Provider (Qwen/OpenAI/DeepSeek).\n"
+            # Custom input dialog implementation for clearer preset selection
+            # Using simpledialog for brevity but structuring the prompts to guide the user
+
+            provider_choice = simpledialog.askstring(
+                "Step 1/4: Select Provider",
+                "Enter Provider Number:\n\n1. OpenAI (Default)\n2. ModelScope (Qwen Free/Paid)\n3. Custom (DeepSeek, etc.)\n"
+            )
+
+            if not provider_choice: return
+
+            # Defaults
+            default_base = "https://api.openai.com/v1"
+            default_model = "gpt-3.5-turbo"
+
+            if provider_choice.strip() == "2":
+                # ModelScope Preset
+                default_base = "https://api-inference.modelscope.cn/v1"
+                default_model = "Qwen/Qwen3-235B-A22B-Instruct-2507"
+                msg_key = "Enter ModelScope/DashScope API Key:"
+            else:
+                msg_key = "Enter API Key:"
 
             while True:
-                key = simpledialog.askstring("Setup Step 1/3", msg + "\nEnter API Key:")
-                if not key: return # User cancelled
+                # Step 2: API Key
+                key = simpledialog.askstring("Step 2/4: API Key", msg_key)
+                if not key: return
 
-                base = simpledialog.askstring("Setup Step 2/3", "Enter Base URL (e.g. https://dashscope.aliyuncs.com/compatible-mode/v1):\n(Leave empty for default OpenAI)")
-                if base is None: return # User cancelled
-                if not base: base = "https://api.openai.com/v1"
+                # Step 3: Base URL
+                base = simpledialog.askstring("Step 3/4: Base URL", f"Enter Base URL (Default: {default_base}):", initialvalue=default_base)
+                if base is None: return
+                if not base: base = default_base
 
-                # Step 3: Model Selection
-                model_input = simpledialog.askstring("Setup Step 3/3", "Enter Model Name (e.g., gpt-3.5-turbo, qwen-plus, deepseek-chat):")
-                if model_input is None: return # User cancelled
-                if not model_input: model_input = "gpt-3.5-turbo"
+                # Step 4: Model
+                model_input = simpledialog.askstring("Step 4/4: Model", f"Enter Model Name (Default: {default_model}):", initialvalue=default_model)
+                if model_input is None: return
+                if not model_input: model_input = default_model
 
                 # Test Connection
                 if messagebox.askyesno("Test Connection", f"Do you want to test the connection to '{model_input}' now?"):
