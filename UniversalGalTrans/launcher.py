@@ -60,7 +60,7 @@ def setup_wizard(cfg):
             if provider_choice.strip() == "2":
                 # ModelScope Preset
                 default_base = "https://api-inference.modelscope.cn/v1"
-                default_model = "Qwen/Qwen3-235B-A22B-Instruct-2507"
+                default_model = "Qwen/Qwen3-14B"
                 msg_key = "Enter ModelScope/DashScope API Key:"
             else:
                 msg_key = "Enter API Key:"
