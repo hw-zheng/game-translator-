@@ -46,6 +46,11 @@ class ConfigManager:
         elif os.path.exists(os.path.join("..", config_path)):
              self.config.read(os.path.join("..", config_path), encoding='utf-8')
 
+        # Ensure all default sections exist in self.config so writes don't fail
+        for section in self.defaults:
+            if not self.config.has_section(section):
+                self.config.add_section(section)
+
     def get(self, section, key, fallback=None):
         # 1. Try Config File
         if self.config.has_option(section, key):
