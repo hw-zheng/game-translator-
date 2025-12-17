@@ -100,7 +100,14 @@ def run_tests():
     except Exception as e:
         print(f"FAIL: {e}")
         # Print server logs if fail
-        # print(server_process.stdout.read().decode())
+        try:
+             outs, errs = server_process.communicate(timeout=1)
+             print("--- Server STDOUT ---")
+             print(outs.decode() if outs else "")
+             print("--- Server STDERR ---")
+             print(errs.decode() if errs else "")
+        except:
+             pass
     finally:
         print("\n[Test] Terminating Server...")
         server_process.terminate()

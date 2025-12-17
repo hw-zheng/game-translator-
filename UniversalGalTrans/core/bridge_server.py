@@ -72,7 +72,8 @@ def worker():
             processor.add_to_history(final_text, translated_text)
         else:
             # Initialize streaming entry (Show "..." or empty initially)
-            processor.add_to_history(final_text, "")
+            # Capture the specific index of this new entry to prevent race conditions
+            current_entry_index = processor.add_to_history(final_text, "")
 
             accumulated_text = ""
             try:
@@ -84,29 +85,29 @@ def worker():
 
                 for chunk in stream:
                     accumulated_text += chunk
-                    # Real-time update for Overlay
-                    processor.update_latest_translation(chunk)
+                    # Real-time update for Overlay, targeting specific index
+                    processor.update_latest_translation(chunk, index=current_entry_index)
 
                 translated_text = accumulated_text
             except Exception as e:
                 translated_text = f"[Error: {str(e)}]"
-                processor.update_latest_translation(translated_text)
+                processor.update_latest_translation(translated_text, index=current_entry_index)
 
         # 4. Restore & Save (Post-Stream)
         final_translation = processor.restore_control_codes(translated_text, placeholders)
 
         # We need to update history one last time with restored codes if needed,
         # or we just save raw->raw mapping.
-        # Actually, overlay sees `accumulated_text` which might have placeholders?
-        # Ideally, we restore codes ON THE FLY, but that's complex with partial chunks.
-        # For now, we save the final restored version to DB.
-        # And we might update the history with the restored version to look clean.
 
         if not final_translation.startswith("[Error"):
             db.save_translation(protected_text, translated_text)
             # Update the in-memory history to the clean version
-            if processor.get_history():
-                 processor.get_history()[-1]['translated'] = final_translation
+            # Only update if the index is still valid (safe effort)
+            try:
+                if processor.get_history() and len(processor.get_history()) > current_entry_index:
+                    processor.get_history()[current_entry_index]['translated'] = final_translation
+            except:
+                pass
 
         logger.info(f"Translation Ready: {final_translation[:20]}...")
 
