@@ -42,11 +42,12 @@ class LLMClient:
         """Tests the connection to the AI provider."""
         try:
             # We use a very cheap/simple call to verify connectivity
+            # Keep non-streaming for connection test, so disable thinking if needed
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": "Hello"}],
                 max_tokens=5,
-                extra_body=self._get_extra_body()
+                extra_body=self._get_extra_body(is_stream=False)
             )
             return True, "Connection successful"
         except APIStatusError as e:
@@ -70,11 +71,13 @@ class LLMClient:
         except Exception as e:
             return False, f"System Error: {str(e)}"
 
-    def _get_extra_body(self):
+    def _get_extra_body(self, is_stream=False):
         """Returns extra parameters for specific providers."""
         # Qwen/ModelScope 'thinking' models require enabling_thinking=False for non-streaming
-        if "modelscope" in self.base_url or "dashscope" in self.base_url or "aliyun" in self.base_url:
-            return {"enable_thinking": False}
+        # If streaming, we allow thinking (default)
+        if ("modelscope" in self.base_url or "dashscope" in self.base_url or "aliyun" in self.base_url):
+            if not is_stream:
+                return {"enable_thinking": False}
         return {}
 
     def translate(self, text, history=None, glossary=None):
@@ -99,16 +102,21 @@ class LLMClient:
                 "model": self.model,
                 "messages": messages,
                 "temperature": 0.3,
+                "stream": True # Enable streaming
             }
 
             # Gemini OpenAI adapter sometimes requires max_tokens
             if self.provider == "gemini":
                 params["max_tokens"] = 1024
 
-            # Inject extra body for specific providers (e.g. Qwen thinking disable)
-            params["extra_body"] = self._get_extra_body()
+            # Inject extra body (allow thinking if streaming)
+            params["extra_body"] = self._get_extra_body(is_stream=True)
 
-            response = self.client.chat.completions.create(**params)
-            return response.choices[0].message.content.strip()
+            stream = self.client.chat.completions.create(**params)
+
+            for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+
         except Exception as e:
-            return f"[Error: {str(e)}]"
+            yield f"[Error: {str(e)}]"

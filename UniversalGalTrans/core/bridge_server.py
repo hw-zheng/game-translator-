@@ -69,18 +69,44 @@ def worker():
             # Simulate latency
             time.sleep(0.5)
             translated_text = f"[Simulated] {protected_text}"
+            processor.add_to_history(final_text, translated_text)
         else:
-            translated_text = client.translate(
-                protected_text,
-                history=processor.get_history(),
-                glossary=processor.get_glossary()
-            )
+            # Initialize streaming entry (Show "..." or empty initially)
+            processor.add_to_history(final_text, "")
 
-        # 4. Restore & Save
+            accumulated_text = ""
+            try:
+                stream = client.translate(
+                    protected_text,
+                    history=processor.get_history(),
+                    glossary=processor.get_glossary()
+                )
+
+                for chunk in stream:
+                    accumulated_text += chunk
+                    # Real-time update for Overlay
+                    processor.update_latest_translation(chunk)
+
+                translated_text = accumulated_text
+            except Exception as e:
+                translated_text = f"[Error: {str(e)}]"
+                processor.update_latest_translation(translated_text)
+
+        # 4. Restore & Save (Post-Stream)
         final_translation = processor.restore_control_codes(translated_text, placeholders)
+
+        # We need to update history one last time with restored codes if needed,
+        # or we just save raw->raw mapping.
+        # Actually, overlay sees `accumulated_text` which might have placeholders?
+        # Ideally, we restore codes ON THE FLY, but that's complex with partial chunks.
+        # For now, we save the final restored version to DB.
+        # And we might update the history with the restored version to look clean.
+
         if not final_translation.startswith("[Error"):
             db.save_translation(protected_text, translated_text)
-            processor.add_to_history(final_text, final_translation)
+            # Update the in-memory history to the clean version
+            if processor.get_history():
+                 processor.get_history()[-1]['translated'] = final_translation
 
         logger.info(f"Translation Ready: {final_translation[:20]}...")
 

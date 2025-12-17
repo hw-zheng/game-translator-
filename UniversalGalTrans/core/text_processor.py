@@ -34,6 +34,11 @@ class TextProcessor:
         if len(self.history) > 20: # Keep memory efficient
             self.history.pop(0)
 
+    def update_latest_translation(self, text_chunk):
+        """Append text to the latest translation entry (Streaming support)."""
+        if self.history:
+            self.history[-1]['translated'] += text_chunk
+
     def get_history(self):
         return self.history
 
