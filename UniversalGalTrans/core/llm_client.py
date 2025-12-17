@@ -1,7 +1,7 @@
 import os
 import json
 import requests
-from openai import OpenAI
+from openai import OpenAI, APIStatusError, APITimeoutError
 
 class LLMClient:
     def __init__(self, api_key, base_url, model, provider="openai"):
@@ -48,8 +48,16 @@ class LLMClient:
                 max_tokens=5
             )
             return True, "Connection successful"
+        except APIStatusError as e:
+            # Return detailed API error (401, 404, etc)
+            error_msg = f"API Error {e.status_code}: {e.message}"
+            if e.response.text:
+                 error_msg += f" | Details: {e.response.text}"
+            return False, error_msg
+        except APITimeoutError:
+            return False, "Connection Timed Out. Check your Base URL."
         except Exception as e:
-            return False, str(e)
+            return False, f"System Error: {str(e)}"
 
     def translate(self, text, history=None, glossary=None):
         messages = [{"role": "system", "content": self.system_prompt}]

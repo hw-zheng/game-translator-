@@ -48,7 +48,7 @@ def setup_wizard(cfg):
 
             provider_choice = simpledialog.askstring(
                 "Step 1/4: Select Provider",
-                "Enter Provider Number:\n\n1. OpenAI (Default)\n2. ModelScope (Qwen Free/Paid)\n3. Custom (DeepSeek, etc.)\n"
+                "Enter Provider Number:\n\n1. OpenAI\n2. Alibaba DashScope (For 'sk-...' keys)\n3. ModelScope Community (For 'tokens')\n4. Custom\n"
             )
 
             if not provider_choice: return
@@ -56,14 +56,20 @@ def setup_wizard(cfg):
             # Defaults
             default_base = "https://api.openai.com/v1"
             default_model = "gpt-3.5-turbo"
+            msg_key = "Enter API Key:"
 
-            if provider_choice.strip() == "2":
-                # ModelScope Preset
+            choice = provider_choice.strip()
+
+            if choice == "2":
+                # DashScope (Stable Commercial)
+                default_base = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+                default_model = "qwen-plus"
+                msg_key = "Enter DashScope API Key (sk-...):"
+            elif choice == "3":
+                # ModelScope (Community Inference)
                 default_base = "https://api-inference.modelscope.cn/v1"
                 default_model = "Qwen/Qwen3-14B"
-                msg_key = "Enter ModelScope/DashScope API Key:"
-            else:
-                msg_key = "Enter API Key:"
+                msg_key = "Enter ModelScope Access Token:"
 
             while True:
                 # Step 2: API Key
