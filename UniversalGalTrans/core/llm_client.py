@@ -45,7 +45,8 @@ class LLMClient:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": "Hello"}],
-                max_tokens=5
+                max_tokens=5,
+                extra_body=self._get_extra_body()
             )
             return True, "Connection successful"
         except APIStatusError as e:
@@ -68,6 +69,13 @@ class LLMClient:
             return False, "Connection Timed Out. Check your Base URL."
         except Exception as e:
             return False, f"System Error: {str(e)}"
+
+    def _get_extra_body(self):
+        """Returns extra parameters for specific providers."""
+        # Qwen/ModelScope 'thinking' models require enabling_thinking=False for non-streaming
+        if "modelscope" in self.base_url or "dashscope" in self.base_url or "aliyun" in self.base_url:
+            return {"enable_thinking": False}
+        return {}
 
     def translate(self, text, history=None, glossary=None):
         messages = [{"role": "system", "content": self.system_prompt}]
@@ -96,6 +104,9 @@ class LLMClient:
             # Gemini OpenAI adapter sometimes requires max_tokens
             if self.provider == "gemini":
                 params["max_tokens"] = 1024
+
+            # Inject extra body for specific providers (e.g. Qwen thinking disable)
+            params["extra_body"] = self._get_extra_body()
 
             response = self.client.chat.completions.create(**params)
             return response.choices[0].message.content.strip()
