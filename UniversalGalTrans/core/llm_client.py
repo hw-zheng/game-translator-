@@ -49,10 +49,20 @@ class LLMClient:
             )
             return True, "Connection successful"
         except APIStatusError as e:
+            # Check for ModelScope Real-name verification error
+            error_text = e.response.text if e.response.text else str(e.message)
+            if e.status_code == 403 and "real-name verified" in error_text:
+                return False, (
+                    "ModelScope Authorization Failed (403): \n"
+                    "Your ModelScope account requires Real-Name Verification (linked to Aliyun).\n"
+                    "Please visit: https://www.modelscope.cn/my/accountsettings\n"
+                    "(提示：请登录 ModelScope 官网绑定阿里云账号进行实名认证)"
+                )
+
             # Return detailed API error (401, 404, etc)
             error_msg = f"API Error {e.status_code}: {e.message}"
-            if e.response.text:
-                 error_msg += f" | Details: {e.response.text}"
+            if error_text:
+                 error_msg += f" | Details: {error_text}"
             return False, error_msg
         except APITimeoutError:
             return False, "Connection Timed Out. Check your Base URL."
